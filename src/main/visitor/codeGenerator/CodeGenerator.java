@@ -16,14 +16,33 @@ import main.visitor.Visitor;
 import main.visitor.type.ExpressionTypeChecker;
 import java.io.*;
 import java.util.*;
+import main.ast.nodes.Program;
+import main.ast.nodes.declaration.*;
+import main.ast.nodes.declaration.struct.*;
+import main.ast.nodes.expression.Expression;
+import main.ast.nodes.expression.Identifier;
+import main.ast.nodes.expression.operators.BinaryOperator;
+import main.ast.nodes.statement.*;
+import main.ast.types.*;
+import main.ast.types.primitives.*;
+import main.compileError.typeError.*;
+import main.symbolTable.SymbolTable;
+import main.symbolTable.exceptions.*;
+import main.symbolTable.items.*;
+import main.visitor.Visitor;
 
 public class  CodeGenerator extends Visitor<String> {
     ExpressionTypeChecker expressionTypeChecker = new ExpressionTypeChecker();
     private String outputPath;
     private FileWriter currentFile;
+    private int numOfUsedLabel;
+    private FunctionDeclaration currFunc;
+    private int numOfUsedTemp;
 
     private void copyFile(String toBeCopied, String toBePasted) {
         try {
+            this.numOfUsedLabel = 0;
+            this.numOfUsedTemp = 0 ;
             File readingFile = new File(toBeCopied);
             File writingFile = new File(toBePasted);
             InputStream readingFileStream = new FileInputStream(readingFile);
@@ -94,8 +113,47 @@ public class  CodeGenerator extends Visitor<String> {
         addCommand(".end method");
     }
 
+    private String getFreshLabel(){
+        String label = "Label_";
+        label += numOfUsedLabel;
+        numOfUsedLabel++;
+        return label;
+    }
+
+    private String makeTypeSignature(Type t) {
+        if (t instanceof IntType)
+            return "java/lang/Integer";
+        if (t instanceof BoolType)
+            return "java/lang/Boolean";
+        if (t instanceof ListType)
+            return "java/lang/List";
+        if (t instanceof ListType)
+            return "List";
+        if (t instanceof FptrType)
+            return "Fptr";
+        if (t instanceof StructType)
+            return ((StructType)t).getStructName().getName();
+        return null;
+    }
+
     private int slotOf(String identifier) {
-        //todo
+        int count = 1;
+        for(VariableDeclaration arg : currFunc.getArgs()){
+            if(arg.getVarName().getName().equals(identifier))
+                return count;
+            count++;
+        }
+        for(VariableDeclaration var : currFunc.getArgs())
+        {
+            if(var.getVarName().getName().equals(identifier))
+                return count;
+            count++;
+        }
+        if (identifier.equals("")){
+            int temp = numOfUsedTemp;
+            numOfUsedTemp++;
+            return count + temp;
+        }
         return 0;
     }
 
@@ -149,25 +207,41 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(AssignmentStmt assignmentStmt) {
-        //todo
+        BinaryExpression assignExpr = new BinaryExpression(assignmentStmt.getLValue(), assignmentStmt.getRValue(), BinaryOperator.assign);
+        addCommand(assignExpr.accept(this));
+        addCommand("pop");
         return null;
     }
 
     @Override
     public String visit(BlockStmt blockStmt) {
-        //todo
+        for (Statement statement: blockStmt.getStatements()) {
+            statement.accept(this);
+        }
         return null;
     }
 
     @Override
     public String visit(ConditionalStmt conditionalStmt) {
-        //todo
+        String labelFalse = getFreshLabel();
+        String labelAfter = getFreshLabel();
+        addCommand(conditionalStmt.getCondition().accept(this));
+        addCommand("ifeq " + labelFalse);
+        conditionalStmt.getThenBody().accept(this);
+        addCommand("goto " + labelAfter);
+        addCommand(labelFalse + ":");
+        if (conditionalStmt.getElseBody() != null)
+            conditionalStmt.getElseBody().accept(this);
+        addCommand(labelAfter + ":");
         return null;
     }
 
     @Override
     public String visit(FunctionCallStmt functionCallStmt) {
-        //todo
+        expressionTypeChecker.setInFunctionCallStmt(true);
+        addCommand(functionCallStmt.getFunctionCall().accept(this));
+        addCommand("pop");
+        expressionTypeChecker.setInFunctionCallStmt(false);
         return null;
     }
 
@@ -188,7 +262,18 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ReturnStmt returnStmt) {
-        //todo
+        Type type = returnStmt.getReturnedExpr().accept(expressionTypeChecker);
+        if(type instanceof VoidType) {
+            addCommand("return");
+        }
+        else {
+            addCommand( returnStmt.getReturnedExpr().accept(this) );
+            if(type instanceof IntType)
+                addCommand("invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
+            if(type instanceof BoolType)
+                addCommand("invokestatic java/lang/Boolean/valueOf(Z)Ljava/lang/Boolean;");
+            addCommand("areturn");
+        }
         return null;
     }
 
@@ -241,8 +326,19 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ListAccessByIndex listAccessByIndex){
-        //todo
-        return null;
+        String commands = "";
+        Type type = listAccessByIndex.accept(expressionTypeChecker);
+        commands += listAccessByIndex.getInstance().accept(this);
+        commands += listAccessByIndex.getIndex().accept(this);
+        commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
+
+        commands += "checkcast " + makeTypeSignature(type) + "\n";
+
+        if (type instanceof IntType)
+            commands += "invokevirtual java/lang/Integer/intValue()I\n";
+        if (type instanceof BoolType)
+            commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
+        return commands;
     }
 
     @Override
@@ -265,14 +361,19 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(IntValue intValue) {
-        //todo
-        return null;
+        String commands = "";
+        commands += "ldc " + intValue.getConstant() +"\n";
+        return commands;
     }
 
     @Override
     public String visit(BoolValue boolValue) {
-        //todo
-        return null;
+        String commands = "";
+        if(boolValue.getConstant())
+            commands += "ldc " + "1\n";
+        else
+            commands += "ldc " + "0\n";
+        return commands;
     }
 
     @Override
