@@ -157,6 +157,7 @@ public class  CodeGenerator extends Visitor<String> {
         return 0;
     }
 
+
     @Override
     public String visit(Program program) {
         prepareOutputFolder();
@@ -177,20 +178,47 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(StructDeclaration structDeclaration) {
+        try{
+            String structKey = StructSymbolTableItem.START_KEY + structDeclaration.getStructName().getName();
+            StructSymbolTableItem structSymbolTableItem = (StructSymbolTableItem)SymbolTable.root.getItem(structKey);
+            SymbolTable.push(structSymbolTableItem.getStructSymbolTable());
+        }catch (ItemNotFoundException e){//unreachable
+        }
         createFile(structDeclaration.getStructName().getName());
+
         //todo
+
+        SymbolTable.pop();
         return null;
     }
 
     @Override
     public String visit(FunctionDeclaration functionDeclaration) {
+        try{
+            String functionKey = FunctionSymbolTableItem.START_KEY + functionDeclaration.getFunctionName().getName();
+            FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)SymbolTable.root.getItem(functionKey);
+            SymbolTable.push(functionSymbolTableItem.getFunctionSymbolTable());
+        }catch (ItemNotFoundException e){//unreachable
+        }
+
         //todo
+
+        SymbolTable.pop();
         return null;
     }
 
     @Override
     public String visit(MainDeclaration mainDeclaration) {
+        try{
+            String functionKey = FunctionSymbolTableItem.START_KEY + "main";
+            FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)SymbolTable.root.getItem(functionKey);
+            SymbolTable.push(functionSymbolTableItem.getFunctionSymbolTable());
+        }catch (ItemNotFoundException e){//unreachable
+        }
+
         //todo
+
+        SymbolTable.pop();
         return null;
     }
 
