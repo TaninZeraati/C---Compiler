@@ -345,7 +345,10 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ListAppendStmt listAppendStmt) {
-        //todo
+        expressionTypeChecker.setInFunctionCallStmt(true);
+        addCommand(listAppendStmt.getListAppendExpr().accept(this));
+        addCommand("pop");
+        expressionTypeChecker.setInFunctionCallStmt(false);
         return null;
     }
 
