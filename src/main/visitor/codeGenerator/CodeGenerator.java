@@ -38,6 +38,7 @@ public class  CodeGenerator extends Visitor<String> {
     private int numOfUsedLabel;
     private FunctionDeclaration currFunc;
     private int numOfUsedTemp;
+    private StructDeclaration currStruct;
 
     private void copyFile(String toBeCopied, String toBePasted) {
         try {
@@ -158,6 +159,22 @@ public class  CodeGenerator extends Visitor<String> {
     }
 
 
+    private void addDefaultConstructor() {
+        String className = currStruct.getStructName().getName();
+
+        addCommand(".method public <init>()V");
+        addCommand(".limit stack 128");
+        addCommand(".limit locals 128");
+        addCommand("aload 0");
+
+        addCommand("invokespecial " +  "/<init>()V");
+
+
+
+        //todo
+    }
+
+
     @Override
     public String visit(Program program) {
         prepareOutputFolder();
@@ -178,6 +195,7 @@ public class  CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(StructDeclaration structDeclaration) {
+        currStruct = structDeclaration;
         try{
             String structKey = StructSymbolTableItem.START_KEY + structDeclaration.getStructName().getName();
             StructSymbolTableItem structSymbolTableItem = (StructSymbolTableItem)SymbolTable.root.getItem(structKey);
@@ -185,9 +203,9 @@ public class  CodeGenerator extends Visitor<String> {
         }catch (ItemNotFoundException e){//unreachable
         }
         createFile(structDeclaration.getStructName().getName());
-
-        //todo
-
+//        addCommand(".super java/lang/Object");
+        structDeclaration.getBody().accept(this);
+//        addDefaultConstructor();
         SymbolTable.pop();
         return null;
     }
@@ -200,8 +218,16 @@ public class  CodeGenerator extends Visitor<String> {
             SymbolTable.push(functionSymbolTableItem.getFunctionSymbolTable());
         }catch (ItemNotFoundException e){//unreachable
         }
-
-        //todo
+        String header = "";
+//        String funcName = currFunc.getFunctionName().getName();
+        header += ".method public " + functionDeclaration.getFunctionName().getName() + "(";
+        for(VariableDeclaration arg : functionDeclaration.getArgs()){
+            header += "L" + makeTypeSignature(arg.getVarType()) + ";";
+        }
+        if(functionDeclaration.getReturnType() instanceof VoidType)
+            header += ")V";
+        else
+            header += ")L"  + makeTypeSignature(functionDeclaration.getReturnType()) + ";";
 
         SymbolTable.pop();
         return null;
