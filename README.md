@@ -6,3 +6,6 @@ Test the grammar using Parse Tree and print inputs and outputs.\
 No need to check semantic rules.
 
 ## Phase 2:
+Introduction to Semantic Analysis
+Gathering informations about structures,functions,scopes and save in the symbol table.\
+Creating AST, and implement Appropriate actions for C-- grammar.\
